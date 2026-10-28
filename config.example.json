@@ -1,0 +1,14 @@
+{
+  "handle": "thsottiaux",
+  "display_name": "Tibo",
+  "to": "you@example.com",
+  "smtp_host": "smtp.gmail.com",
+  "smtp_port": 587,
+  "smtp_user": "you@gmail.com",
+  "smtp_password": "",
+  "include_quotes": false,
+  "include_replies": false,
+  "include_reposts": true,
+  "market_digest_enabled": true,
+  "market_digest_hour": 8
+}
