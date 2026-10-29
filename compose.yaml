@@ -1,0 +1,13 @@
+services:
+  inforelay:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - ./subscriptions.private.json:/config/subscriptions.json:ro
+      - inforelay-data:/data
+    environment:
+      PYTHONUNBUFFERED: '1'
+      INFO_RELAY_SMTP_PASSWORD: ${INFO_RELAY_SMTP_PASSWORD:-}
+    stop_grace_period: 5m
+volumes:
+  inforelay-data:

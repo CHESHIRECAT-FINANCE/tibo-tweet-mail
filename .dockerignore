@@ -1,0 +1,17 @@
+.git
+.deploy
+.venv
+.inforelay
+__pycache__
+**/__pycache__
+*.pyc
+.env
+.env.*
+subscriptions.json
+subscriptions.private.json
+config.json
+*.key
+outbox
+build
+dist
+*.egg-info

@@ -14,3 +14,7 @@ subscriptions.private.json
 .inforelay/
 .venv/
 *.key
+build/
+dist/
+*.egg-info/
+outbox/

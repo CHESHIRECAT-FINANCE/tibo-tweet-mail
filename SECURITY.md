@@ -20,3 +20,11 @@
 先暂停 `INFO_RELAY_ENABLED`，在邮箱服务商撤销暴露的授权码，再更新 Secret。
 加密密钥轮换需要先使用旧密钥解密状态，再用新密钥重新加密并同步更新 Secret；第一版没有自动轮换向导。
 不要直接覆盖密钥或删掉 `inforelay-state` 来重新开始，这会失去原有队列和去重历史。
+
+## Local console and extensions (0.2)
+
+The console is a single-user desktop companion. It binds to `127.0.0.1`, rejects other Host/Origin values, requires a per-process API token, serves only allowlisted assets and does not return saved SMTP passwords. Do not expose it with a reverse proxy, port forward or tunnel. Python's HTTP server is used only for this loopback companion, not as a production public server.
+
+Plugins are explicitly loaded trusted Python code. They can access files, networks and credentials available to the process; there is no plugin sandbox. Review code before installation. Subscription JSON cannot import modules.
+
+JSON, SQLite and local email settings contain private plaintext data. Restrictive file creation helps on POSIX; use appropriate account/folder permissions on Windows. Cloud checkpoint encryption does not encrypt local backups or exported settings. Stop checks before backing up or migrating state.

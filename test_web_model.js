@@ -16,3 +16,10 @@ for (const url of ['file:///etc/passwd', 'http://127.0.0.1', 'http://169.254.169
 const source = M.createSource('github', 'one'); source.repository = 'not a repository';
 assert.throws(() => M.build([source], email, 'UTC'));
 console.log('Configuration model checks passed (all 5 source types).');
+assert.equal(M.validateSources([M.createSource('rss', 'one')]), true);
+assert.throws(() => M.build([M.createSource('rss', 'one')], email, 'Not/AZone'));
+assert.equal(M.build([M.createSource('rss', 'one')], {...email, smtp_password: ''}, 'UTC', 20, true).email.smtp_password, '');
+assert.throws(() => M.build([M.createSource('rss', 'one')], email, 'UTC', 100));
+console.log('Wizard validation checks passed (saved password and time zone).');
+
+assert.equal(M.checkURL("https://example.com/post"), "https://example.com/post");

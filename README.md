@@ -1,131 +1,107 @@
-# InfoRelay · 信息订阅助手
+# InfoRelay
 
-把你关心的公开信息，按自己的条件送到邮箱。
+**Your sources. Your rules. Your inbox.**
 
-InfoRelay 从一个 X 重置通知和每日行情邮件工具发展而来。现在你可以订阅
-RSS / Atom、网页文字变化、GitHub 新版本、X 动态和每日行情，按关键词筛选，
-在自己的 GitHub 仓库中自动运行。没有托管账户，也不依赖付费 AI 服务。
+[简体中文](README.zh-CN.md) · [User guide](docs/en/guide.md) · [Build your own](docs/en/architecture.md) · [Configuration](docs/en/configuration.md)
 
-**第一版面向个人使用：中文配置页面、邮件通知、MIT 开源。**
+[![Tests](https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail/actions/workflows/tests.yml/badge.svg)](https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## 不写代码也能开始
+InfoRelay turns public information into personal subscriptions. Follow a blog, watch a website, track a GitHub release, read X posts, or receive a daily market digest. Keep the updates you care about and deliver them to your email.
 
-1. [Fork 这个项目](https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail/fork) 到自己的 GitHub。
-   在仓库 **Code → Download ZIP** 下载源码并解压，双击 `web/index.html` 打开中文配置页面。
-   如果浏览器阻止本地脚本，可在项目目录运行 `python3 -m http.server 8765 --bind 127.0.0.1 --directory web`，
-   再打开 `http://127.0.0.1:8765`。
-2. 在页面中选择信息源、设置关键词、填写邮箱，点击「生成我的订阅配置」。
-   页面只在本机处理输入，不连接数据源、不上传密码，也不会发送邮件。
-3. 在自己仓库的 **Settings → Secrets and variables → Actions → Secrets** 创建：
+Run it on your computer with a guided console, or on GitHub Actions while your computer is off. Developers can replace the sources, processing steps, destination and checkpoint storage through documented Python interfaces.
 
-   | Secret 名称 | 填写内容 |
-   |---|---|
-   | `INFO_RELAY_CONFIG` | 页面生成的完整 JSON 配置 |
-   | `INFO_RELAY_STATE_KEY` | 页面生成的加密密钥，需妥善备份 |
+![InfoRelay local setup console](docs/images/console-en.png)
 
-4. 打开 **Actions → InfoRelay subscriptions → Run workflow**。Fork 后如果显示工作流停用，先启用 Actions。
-   先选 `diagnose` 检查连接，再选 `test-email` 发送一封测试邮件。
-5. 收到测试邮件后，在 **Actions → Variables** 创建变量 `INFO_RELAY_ENABLED`，值填 `true`。
-   手动选 `run` 运行一次，确认任务成功、检查点已经保存。之后约每 10 分钟请求自动检查。
+## Choose your starting point
 
-首次运行默认只记录当前内容，不把历史文章全部塞进邮箱。需要历史内容时，可以在配置页面中明确选择。
-行情订阅例外：到发送时段后就发送当天日报。电脑关机不影响 GitHub 云端运行。
+| I want to… | Start here |
+|---|---|
+| Get useful updates without writing code | [Download the source ZIP](https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail/archive/refs/heads/main.zip), unzip it, then follow **Quick start** below |
+| Keep receiving updates while my computer is off | [GitHub Actions guide](docs/en/guide.md#run-on-github-actions) |
+| Build a custom pipeline | [Extension guide and architecture](docs/en/architecture.md) |
+| Run on a server or NAS | [Docker and command-line setup](docs/en/guide.md#server-and-docker) |
 
-> 配置包含邮箱授权码，必须放在 **Secrets**，不要上传到代码仓库、Issue 或截图。
-> QQ / 163 等邮箱要开启 SMTP 并使用授权码；Gmail 使用应用专用密码。
-> 密钥不是每次更新配置都重新生成：已经开始运行后，必须保留原来的 `INFO_RELAY_STATE_KEY`。
+## Quick start
 
-## 支持哪些信息
+You need **Python 3.9+**, an internet connection, and an email provider that supports SMTP with an app password or authorization code. InfoRelay does not require an account or a paid AI service.
 
-| 信息源 | 获取的内容 | 说明 |
-|---|---|---|
-| RSS / Atom | 订阅源里的新文章 | 使用条目 GUID / ID 去重，也支持相对链接与常用命名空间 |
-| 网页更新 | 公共网页文字发生变化 | 忽略脚本、样式和空白变化；首次建立基线；A → B → A 也会通知 |
-| GitHub 发布 | 公开仓库的新 Release | 默认不含预发布；不是 Issue、提交记录或仅创建的标签 |
-| X 动态 | 指定公开账号的新帖子 | 可只收用量重置通知，分别控制转发、回复和引用；依赖 FxTwitter |
-| 每日行情 | 人民币汇率、WTI / 布伦特原油和黄金期货 | 每天指定小时后发送一次；来源 Yahoo Finance，报价可能延迟 |
+1. Download and unzip the project. If Python is missing, install it from [python.org](https://www.python.org/downloads/). On Windows, enable **Add Python to PATH**.
+2. Start the launcher: **Windows:** double-click `start.bat`. **macOS:** double-click `start.command`. **Linux / terminal:** run `python3 start.py` from the project folder. The first launch creates a local virtual environment and installs the declared dependencies. If macOS refuses to launch the file, run `python3 start.py` in Terminal.
+3. In the browser, choose sources, select your email provider, and enter your email app password. The recipient defaults to the sending address and can be changed.
+4. Click **Save & check**, then **Send one test email**. After checking your inbox, tick the delivery checkbox and click **Start automatic checks**.
 
-每个来源可以设置包含关键词、排除关键词、任一 / 全部匹配。关键词不区分大小写，排除规则优先。
-每条内容最多保留正文前 10000 个字符用于筛选与邮件。网页关键词针对这段提取出的文字，
-不是仅针对变化的部分；复杂或很长的页面建议优先使用 RSS。
+The console opens at `http://127.0.0.1:8766`. Keep the launcher and computer running. Closing the browser tab does not stop checks; closing the launcher does. Restart checks from the console after restarting the launcher.
 
-多个来源独立运行。每个来源每轮最多一封汇总邮件，默认每封 20 条；超过的条目留在队列等待后续运行。
-一个来源暂时失败，不阻止其他来源。已经入队的内容即使从原始窗口消失，也能继续重试。
-
-## 修改订阅
-
-在配置页面选择「导入已有配置」，修改后只更新 `INFO_RELAY_CONFIG`。导入会保留来源 ID。
-请保留下载的私密配置文件和原加密密钥，并避免把文件放进共享文件夹。
-
-- `id` 是订阅的长期标识。改名称不会重发历史内容。
-- 改 URL、筛选条件等会重新建立基线；如果还有待发内容，会暂停该来源并要求先用原配置清空队列。
-- 暂停或移除来源不会自动删除其待发记录。恢复相同 ID 和配置后继续处理。
-- 从旧版迁移时，先验证新订阅，再停用旧任务，避免同一主题收到两份通知。
-
-## 本地运行
-
-Python 3.9+。建议使用虚拟环境；`cryptography` 用于云端检查点加密。
+**Already have Python and prefer the terminal?**
 
 ```sh
 python3 -m venv .venv
+# macOS / Linux:
 source .venv/bin/activate
+# Windows PowerShell instead: .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-python -m info_relay init
-# 编辑 subscriptions.json，也可以使用配置页面生成的 subscriptions.private.json
-python -m info_relay check
-python -m info_relay preview
-python -m info_relay diagnose
-python -m info_relay test-email   # 只有明确运行此命令才发测试邮件
-python -m info_relay run
+python -m info_relay serve
 ```
 
-也可以使用 `--config /path/to/subscriptions.private.json` 或环境变量 `INFO_RELAY_CONFIG`。
-本地不想把密码写进配置文件时，可以留空 `smtp_password`，另设 `INFO_RELAY_SMTP_PASSWORD`。
-状态默认位于 `.inforelay/state.json`，用 `--state` 指定其他位置。
+[Detailed instructions, email setup and troubleshooting →](docs/en/guide.md)
 
-`preview` 显示每个来源最多 5 条匹配样例，不发送、不修改状态；它不是下一次待发队列的列表。
-`diagnose` 只显示连接检查结果，不在日志中输出文章正文。`run` 才实际发送订阅邮件。
-可以用 cron / systemd 等定期运行 `run`。不要同时开本地和云端两个独立调度器。
+## What you can subscribe to
 
-完整配置示例见 [subscriptions.example.json](subscriptions.example.json)，字段说明见 [配置参考](docs/configuration.md)。
+| Source | What it tracks | Example |
+|---|---|---|
+| RSS / Atom | New feed items | Blog posts and news feeds |
+| Website text | Changes in public page text | A release page or public announcement |
+| GitHub | New Releases, optionally prereleases | `cli/cli` |
+| X | Public posts through FxTwitter | A creator or product account; optional usage-reset filter |
+| Daily markets | CNY exchange rates, WTI/Brent oil and gold futures | One digest after your chosen local hour |
 
-## 使用前了解
+Each source has include/exclude keywords, any/all matching, a pause switch and a first-run policy. Existing feed items are skipped by default. Website monitoring records the first snapshot, then reports transitions—including A → B → A. Markets send that day’s digest once it is due.
 
-- **GitHub 调度是尽力执行。** 10 分钟是请求频率，不是准时承诺；可能延迟或被跳过。
-  公共仓库长期不活跃时也可能停用定时任务。需要严格时效时，用常驻服务器调度。
-  参见 [GitHub schedule 文档](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)。
-- 标准公共仓库 GitHub-hosted runner 通常免费，私有仓库和其他 runner 以账户额度为准。
-  参见 [Actions 计费说明](https://docs.github.com/en/actions/concepts/billing-and-usage)。
-- 只支持公开 HTTP(S) 信息源，不支持登录、付费墙、私有 API 或执行网页 JavaScript。
-  每个响应最多 2 MB；每个 feed 最多 1000 条；GitHub 每次最新 10 个发布、X 最新 20 条。
-  长时间停机可能错过尚未抓到、已离开来源窗口的内容。
-- 公共 GitHub API 有未认证访问频率限制。请减少频繁重复的来源；程序遵守有限范围内的 `Retry-After`，
-  更长的等待交给后续调度。使用前确认目标站点允许你的访问方式和频率。
-- 邮件服务器接受消息不等于进入收件箱，请检查垃圾邮件、过滤规则和 SMTP 授权码。
-  SMTP 不能保证端到端「恰好一次」：服务器已接收但连接断开，或刚发出邮件就保存失败，可能造成后续重复。
-- 云端的待发快照和记录使用 [Fernet 认证加密](https://cryptography.io/en/latest/fernet/)，
-  `inforelay-state` 分支只保存 `subscriptions.enc`。更新次数、时间和大致大小仍可见。
-  **不要删除此分支或直接更换密钥**，否则可能无法恢复队列和去重记录。
-  本地 `.inforelay` 是明文私有状态，已列入 `.gitignore`；不要公开分享它。
-- 单来源最多保留 500 条待发记录和最近 5000 个已见条目，总状态最多 20 MB。容量不足会停止追加，
-  保留已有队列，等待修复邮箱后继续处理。有限去重窗口以外的极旧条目重新出现时可能再次通知。
+## Two experiences, one engine
 
-## 原有 Tibo 邮件功能
+**For everyday use:** a Chinese/English setup wizard, provider presets, live preview, connection checks, a test-email button, start/stop controls and visible runtime results. The local console stores your settings only when you save them. It never returns a saved email password to the browser.
 
-旧的 `tibo_tweet_mail.py`、`mail-state` 分支、`TIBO_MAIL_CONFIG` 和 `MAIL_ENABLED` 继续使用原配置。
-新工作流默认关闭，使用独立的开关、Secrets 和加密状态分支，安装新源码不会自动改变旧订阅。
-详见 [旧版使用说明与已修复问题](docs/legacy.md)。
+**For builders:** a versioned plugin contract for sources, processors and destinations; JSON and SQLite checkpoint stores; a Python API, installable CLI, working plugin examples and a headless Docker configuration. No extension is loaded from a subscription JSON: trusted plugins must be explicitly registered or loaded with `--plugin`.
 
-## 开发与贡献
+```mermaid
+flowchart LR
+    S[Public sources] --> N[Validated items]
+    N --> P[Processors and keyword rules]
+    P --> Q[Durable pending queue]
+    Q --> D[Email or custom destination]
+    D --> C[Delivery checkpoint]
+    C --> Q
+```
+
+Try a pipeline that writes to local JSON files and **does not send email**:
 
 ```sh
-python -m pip install -r requirements.txt
-python -m unittest -v
-node test_web_model.js
+python -m info_relay preview --config examples/diy.json
+python -m info_relay run --config examples/diy.json --state .inforelay/diy-state.json
 ```
 
-测试使用本地 fixtures、模拟 SMTP 和临时 Git 仓库，不发送邮件。CI 覆盖 Python 3.9 / 3.13。
-纯静态配置页面无需前端构建工具或第三方脚本。
+See [`examples/custom_plugin.py`](examples/custom_plugin.py) for a JSON source, a word-count processor and a Markdown destination implemented without editing the engine.
 
-欢迎贡献新的公开信息源和通知渠道，见 [CONTRIBUTING.md](CONTRIBUTING.md)。
-安全问题见 [SECURITY.md](SECURITY.md)。采用 [MIT License](LICENSE)。
+## Reliability and limits
+
+- Pending items are saved before delivery and removed only after a destination reports success. A failing source does not block healthy sources. Cloud checkpoints use Fernet authenticated encryption on a separate `inforelay-state` branch.
+- Delivery is **at least once**, not exactly once. A server may accept a message before a connection or checkpoint failure is observed; a retry can produce a duplicate. Custom destinations receive a stable batch ID for deduplication.
+- GitHub scheduling is best effort. A requested 10-minute interval is not a timing guarantee. Long inactivity may disable scheduled workflows. Local mode requires a running computer.
+- Built-in sources are public HTTP(S) only. There is no JavaScript browser rendering, login, private API access or paywall support. X and market adapters depend on third-party availability.
+- Response windows and state are bounded: 2 MB per response, up to 1,000 feed items, 10 GitHub releases, 20 X posts, 500 pending items and 5,000 remembered IDs per source, 20 MB total checkpoint size. Long outages can miss items no longer present at the source. Keywords examine the title and the retained first 10,000 body characters.
+- This is a personal, single-writer tool. The local console binds only to `127.0.0.1`; it is not a public or multi-user hosting service. Plugins are trusted code with the permissions of your Python process.
+
+Version 0.2 adds tested extension boundaries and a guided local runtime. It is an early open-source release; see the [compatibility and upgrade policy](docs/en/architecture.md#compatibility-and-upgrades).
+
+## Existing Tibo subscriptions
+
+Your original `tibo_tweet_mail.py`, `mail-state`, `TIBO_MAIL_CONFIG` and `MAIL_ENABLED` continue using their existing settings. The new workflow is opt-in and uses separate configuration and state. [Legacy guide](docs/legacy.md).
+
+## Documentation and community
+
+- [English user guide](docs/en/guide.md) / [中文使用指南](docs/zh/guide.md)
+- [English architecture and extension guide](docs/en/architecture.md) / [中文架构与扩展指南](docs/zh/architecture.md)
+- [Configuration reference](docs/en/configuration.md) / [中文配置参考](docs/configuration.md)
+- [Contributing](CONTRIBUTING.md), [security policy](SECURITY.md), [changelog](CHANGELOG.md), [MIT license](LICENSE)
+
+The documentation structure draws inspiration from [changedetection.io](https://github.com/dgtlmoon/changedetection.io), [Apprise](https://github.com/caronc/apprise) and [Folo](https://github.com/RSSNext/Folo): explain the outcome first, show a direct starting path, and keep developer details in dedicated guides.

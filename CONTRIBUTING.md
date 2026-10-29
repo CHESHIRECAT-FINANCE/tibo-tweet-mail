@@ -1,26 +1,28 @@
-# 参与贡献
+# Contributing / 参与贡献
 
-欢迎改进中文上手体验、公开信息源支持、可访问性和发送可靠性。
+Thank you for improving InfoRelay. Start with the [architecture guide](docs/en/architecture.md) or [中文架构指南](docs/zh/architecture.md).
 
-1. Fork 后创建工作分支，使用 `subscriptions.example.json` 和假邮箱地址开发。
-2. 安装 `requirements.txt`，运行 `python -m unittest -v` 和 `node test_web_model.js`。
-3. UI 修改请用浏览器检查手机宽度、键盘操作、无效输入及生成的 JSON。
-4. PR 写明使用场景、最终行为、验证方式和已知限制。请勿提交配置、授权码、状态明文或真实收件地址。
+## Development
 
-## 增加信息源
+```sh
+python -m venv .venv
+# Activate the environment, then:
+python -m pip install -r requirements.txt
+python -m unittest -v
+node --check web/app.js
+node test_web_model.js
+python -m info_relay serve --no-browser
+```
 
-适配器位于 `info_relay/sources.py`，接口是 `(source, now) -> list[dict]`。
-每个条目只包含 `id/title/body/url/published`，通过 `item()` 构造。
-ID 需要稳定；不能用当前时间代替原始条目身份。`webpage` 是基于变化的特例。
+Tests use fixtures, mocked SMTP and temporary state. Do not send messages to real recipients in tests. Do not commit private settings, credentials, checkpoint databases, generated outbox files or local `.deploy` artifacts.
 
-还需要同步 `config.py` 的校验、`ADAPTERS`、配置页面与文档，并添加离线解析、边界和去重测试。
-使用 `net.get` 进行公共 GET，不携带浏览器 Cookie、仓库 token 或用户邮箱凭据。
-来源内容只能作为文本，不执行来源提供的命令、脚本或模板。
+## Changes we can review
 
-## 修改投递或状态
+- New source, processor or destination: use the public contracts, validate options and add fixture-based tests. Demonstrate failure behavior and stable identities, not just a successful response.
+- Storage changes: preserve atomic writes, bounded snapshots, fail-closed corruption handling and the whole-cycle exclusive lease.
+- User-facing changes: keep Chinese and English flows and guides in sync. Check keyboard navigation and a narrow viewport. Explain prerequisites and recovery steps accurately.
+- Compatibility changes: update the changelog, migration instructions and plugin API/schema version where required.
 
-保持既有测试和旧版 Tibo 入口兼容。不要绕过 TLS 校验，不要把 SMTP 不确定的提交结果当成安全重试。
-任何发送必须先保存待发快照；成功后保存再继续。云端只能发布经过校验的加密状态文件。
-改变持久化格式时必须设计迁移，不能通过清空去重记录完成升级。
+A PR should describe the user-visible problem, resulting behavior and validation. Keep unrelated changes separate. Start an issue for major new dependencies or a change to delivery semantics. We do not promise support for private scraping, paywall bypasses or publicly exposed console servers.
 
-目前仅支持邮件通知。其他通知渠道应实现明确的成功/失败语义，并说明是否支持服务端幂等键。
+安全问题请按 [SECURITY.md](SECURITY.md) 处理；普通问题请提供可复现步骤和脱敏信息，不要粘贴授权码或完整配置。

@@ -1,2 +1,4 @@
 # Authenticated encryption for cloud checkpoints. Local fetching/mail uses stdlib.
 cryptography==50.0.2
+
+tzdata>=2025.2

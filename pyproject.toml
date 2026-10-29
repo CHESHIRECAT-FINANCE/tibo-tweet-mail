@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inforelay-personal"
+version = "0.2.0"
+description = "A personal information pipeline: public sources, durable queues, and pluggable notifications"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+authors = [{name = "InfoRelay contributors"}]
+dependencies = ["cryptography==50.0.2", "tzdata>=2025.2"]
+
+[project.scripts]
+inforelay = "info_relay.__main__:entrypoint"
+
+[project.urls]
+Repository = "https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail"
+Documentation = "https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail/tree/main/docs"
+
+[tool.setuptools]
+packages = ["info_relay"]
+py-modules = ["tibo_tweet_mail", "cloud_state", "http_client", "market_digest"]
+
+[tool.setuptools.package-data]
+info_relay = ["example.json"]
+
+[tool.setuptools.data-files]
+"share/inforelay/web" = ["web/index.html", "web/style.css", "web/model.js", "web/app.js", "web/i18n.js"]
