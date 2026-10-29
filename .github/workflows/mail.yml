@@ -2,96 +2,130 @@ name: Tibo notices and daily market mail
 
 on:
   schedule:
-    # Every five minutes, away from the top of the hour. GitHub may delay runs.
+    # Best effort: delays can be hours. The digest catches up until midnight.
     - cron: '2-57/5 * * * *'
   workflow_dispatch:
     inputs:
       send_test:
-        description: Send a one-off cloud deployment test email
+        description: Send a one-off SMTP test (independent of data sources)
+        type: boolean
+        default: false
+      diagnose:
+        description: Check all dependencies without sending mail or changing state
         type: boolean
         default: false
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: mail-delivery
   cancel-in-progress: false
 
 jobs:
-  preflight:
-    if: github.event_name == 'workflow_dispatch' && vars.MAIL_ENABLED != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.13'
-      - run: python -m unittest -v
-      - name: Verify source access from GitHub
-        run: |
-          python - <<'PY'
-          from datetime import datetime
-          import tibo_tweet_mail as mail
-          from market_digest import digest_body
-          posts = mail.fetch_posts('thsottiaux')
-          if not posts:
-              raise SystemExit('Timeline is empty; investigate before enabling mail')
-          print(f'Timeline reachable: {len(posts)} posts')
-          digest_body(datetime.now(mail.SHANGHAI))
-          print('All four market sources reachable')
-          PY
   mail:
-    # Enable only after Secrets and the initial checkpoints have been set up.
-    if: vars.MAIL_ENABLED == 'true'
+    if: vars.MAIL_ENABLED == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    permissions:
+      contents: write
     env:
       TIBO_STATE_DIR: ${{ github.workspace }}/../mail-state
+      PYTHONUNBUFFERED: '1'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
+      - name: Run offline regression tests
+        run: python -m unittest -v
       - name: Check configuration
+        id: config
         env:
           TIBO_MAIL_CONFIG: ${{ secrets.TIBO_MAIL_CONFIG }}
         run: |
           python - <<'PY'
+          import os, json
           import tibo_tweet_mail as mail
-          config = mail.load_config()
+          # Mask before validation; never echo secret contents or provider responses.
+          try:
+              raw = json.loads(os.environ['TIBO_MAIL_CONFIG'])
+          except ValueError:
+              raise SystemExit('TIBO_MAIL_CONFIG must contain valid JSON') from None
+          if not isinstance(raw, dict):
+              raise SystemExit('TIBO_MAIL_CONFIG must contain a JSON object')
           for key in ('smtp_password', 'smtp_user', 'to'):
-              value = str(config.get(key) or '')
-              for masked in (value, ''.join(value.split())):
-                  if masked:
-                      escaped = masked.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-                      print('::add-mask::' + escaped)
-          if any(not config.get(key) for key in ('smtp_password', 'smtp_user', 'to')):
-              raise SystemExit('Missing mail credentials in TIBO_MAIL_CONFIG')
+              value = raw.get(key)
+              if isinstance(value, str):
+                  for masked in (value, ''.join(value.split())):
+                      if masked:
+                          escaped = masked.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                          print('::add-mask::' + escaped)
+          mail.validate_config(mail.load_config(), require_smtp=True)
+          print('Configuration valid')
           PY
+      - name: Diagnose without sending
+        id: diagnose
+        if: github.event_name == 'workflow_dispatch' && (inputs.diagnose || (vars.MAIL_ENABLED != 'true' && !inputs.send_test))
+        env:
+          TIBO_MAIL_CONFIG: ${{ secrets.TIBO_MAIL_CONFIG }}
+        run: python tibo_tweet_mail.py diagnose
+      - name: Send requested SMTP test
+        id: smtp_test
+        if: github.event_name == 'workflow_dispatch' && inputs.send_test && !inputs.diagnose
+        env:
+          TIBO_MAIL_CONFIG: ${{ secrets.TIBO_MAIL_CONFIG }}
+        run: python tibo_tweet_mail.py test-email
       - name: Restore delivery checkpoints
         id: state
+        if: vars.MAIL_ENABLED == 'true' && !inputs.diagnose && !inputs.send_test
         env:
           TIBO_INITIAL_STATE: ${{ secrets.TIBO_INITIAL_STATE }}
         run: python cloud_state.py restore
-      - name: Check notices and send due mail
+      - name: Send due market digest
+        id: market
+        if: success() && steps.state.outcome == 'success'
         env:
           TIBO_MAIL_CONFIG: ${{ secrets.TIBO_MAIL_CONFIG }}
-        run: python tibo_tweet_mail.py run
+        run: python tibo_tweet_mail.py run-market
+      - name: Persist market checkpoint before checking notices
+        id: market_save
+        if: ${{ !cancelled() && steps.state.outcome == 'success' }}
+        run: python cloud_state.py save
+      - name: Check reset notices
+        id: notices
+        if: ${{ !cancelled() && steps.market_save.outcome == 'success' }}
+        env:
+          TIBO_MAIL_CONFIG: ${{ secrets.TIBO_MAIL_CONFIG }}
+        run: python tibo_tweet_mail.py run-notices
       - name: Save delivery checkpoints even if a source failed
+        id: save
         if: always() && steps.state.outcome == 'success'
         run: python cloud_state.py save
-      - name: Send requested deployment test
-        if: github.event_name == 'workflow_dispatch' && inputs.send_test
+      - name: Summarize results
+        if: always()
         env:
-          TIBO_MAIL_CONFIG: ${{ secrets.TIBO_MAIL_CONFIG }}
+          CONFIG_RESULT: ${{ steps.config.outcome }}
+          STATE_RESULT: ${{ steps.state.outcome }}
+          MARKET_RESULT: ${{ steps.market.outcome }}
+          MARKET_SAVE_RESULT: ${{ steps.market_save.outcome }}
+          NOTICES_RESULT: ${{ steps.notices.outcome }}
+          SAVE_RESULT: ${{ steps.save.outcome }}
+          DIAGNOSE_RESULT: ${{ steps.diagnose.outcome }}
+          SMTP_TEST_RESULT: ${{ steps.smtp_test.outcome }}
         run: |
           python - <<'PY'
-          import tibo_tweet_mail as mail
-          mail.deliver(mail.load_config(), '[云端测试] 邮件任务已迁移至 GitHub Actions',
-                       '这封邮件由 GitHub 云端发出。电脑关机后，任务仍可按计划执行。\n')
-          print('Cloud deployment test delivered')
+          import os
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as report:
+              report.write('运行时间：' + str(datetime.now(ZoneInfo('Asia/Shanghai'))) + '\n\n')
+              report.write('| 阶段 | 结果 |\n|---|---|\n')
+              for label, key in [('配置', 'CONFIG_RESULT'), ('诊断', 'DIAGNOSE_RESULT'),
+                                 ('测试邮件', 'SMTP_TEST_RESULT'), ('状态恢复', 'STATE_RESULT'),
+                                 ('行情', 'MARKET_RESULT'), ('行情状态保存', 'MARKET_SAVE_RESULT'),
+                                 ('重置通知', 'NOTICES_RESULT'),
+                                 ('状态保存', 'SAVE_RESULT')]:
+                  report.write(f'| {label} | {os.environ.get(key) or "未执行"} |\n')
+              report.write('\n行情与时间线分别执行；某一来源失败不代表其他邮件未发送。\n')
           PY
