@@ -7,8 +7,10 @@ permissions:
   contents: read
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    # Python 3.9 has no build for Ubuntu 26.04 (ubuntu-latest).
+    runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         python: ['3.9', '3.13']
     steps:
