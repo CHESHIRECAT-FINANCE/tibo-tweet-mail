@@ -27,8 +27,12 @@ def fresh(fp):
 def collect(entry, source, rows):
     rows = [state.checked_item(row) for row in rows]
     if not rows:
-        # An empty feed may be temporary; do not establish an initial baseline yet.
-        return entry, 0
+        # A valid empty feed/release list is a baseline too: its first future item is new.
+        # Adapters raise on network/format errors; market-before-hour isn't a snapshot.
+        updated = copy.deepcopy(entry)
+        if source["type"] != "market":
+            updated["seeded"] = True
+        return updated, 0
     updated = copy.deepcopy(entry)
     first = not entry["seeded"]
     queued = []
