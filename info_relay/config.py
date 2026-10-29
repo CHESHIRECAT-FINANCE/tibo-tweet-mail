@@ -8,12 +8,12 @@ import re
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from .net import public_url
+from .plugins import default_registry
 
 KINDS = {"rss", "webpage", "github", "x", "market"}
 SOURCE_FIELDS = {"id", "name", "type", "enabled", "url", "repository", "handle",
                  "keywords", "exclude", "match", "initial", "prereleases", "reset_only",
-                 "include_reposts", "include_replies", "include_quotes", "hour"}
+                 "include_reposts", "include_replies", "include_quotes", "hour", "options", "processors"}
 EMAIL_FIELDS = {"smtp_host", "smtp_port", "smtp_user", "smtp_password", "to"}
 
 
@@ -24,8 +24,9 @@ def text(value, label, maximum=200):
     return value.strip()
 
 
-def validate(raw):
-    if not isinstance(raw, dict) or set(raw) - {"version", "timezone", "sources", "email", "batch_size"}:
+def validate(raw, registry=None):
+    registry = registry or default_registry()
+    if not isinstance(raw, dict) or set(raw) - {"version", "timezone", "sources", "email", "batch_size", "delivery"}:
         raise ValueError("配置必须是对象，且不能包含未知顶层字段")
     cfg = copy.deepcopy(raw)
     if type(cfg.get("version", 1)) is not int or cfg.get("version", 1) != 1:
@@ -51,7 +52,7 @@ def validate(raw):
             raise ValueError("信息源 id 必须唯一，只能包含字母、数字、下划线和短横线")
         ids.add(sid)
         kind = source.get("type")
-        if not isinstance(kind, str) or kind not in KINDS:
+        if not isinstance(kind, str) or kind not in registry.sources:
             raise ValueError(f"{sid}: 不支持的信息源类型")
         source["name"] = text(source.get("name", sid), f"{sid}.name", 80)
         for key, default in (("enabled", True), ("prereleases", False), ("reset_only", False),
@@ -68,24 +69,30 @@ def validate(raw):
             if not isinstance(source[key], list) or len(source[key]) > 30:
                 raise ValueError(f"{sid}.{key} 必须是最多 30 个词的列表")
             source[key] = [text(word, f"{sid}.{key}", 100) for word in source[key]]
-        if kind in ("rss", "webpage"):
-            source["url"] = public_url(text(source.get("url"), f"{sid}.url", 2000))
-        if kind == "github":
-            repo = source.get("repository", "")
-            if not isinstance(repo, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo):
-                raise ValueError(f"{sid}.repository 使用 owner/repository 格式")
-        if kind == "x":
-            handle = source.get("handle", "")
-            if not isinstance(handle, str) or not re.fullmatch(r"[A-Za-z0-9_]{1,15}", handle):
-                raise ValueError(f"{sid}.handle 使用不含 @ 的 X 用户名")
-        if kind == "market":
-            source.setdefault("hour", 8)
-            if type(source["hour"]) is not int or not 0 <= source["hour"] <= 23:
-                raise ValueError(f"{sid}.hour 必须为 0 到 23 的整数")
+        if "options" in source and not isinstance(source["options"], dict):
+            raise ValueError("source.options must be an object")
+        registry.sources[kind].validate(source)
+        pipeline = source.get("processors", [])
+        if not isinstance(pipeline, list) or len(pipeline) > 10:
+            raise ValueError("processors must be a list of at most 10 steps")
+        for step in pipeline:
+            validate_extension(step, registry.processors, "processor")
+    if "delivery" in cfg:
+        validate_extension(cfg["delivery"], registry.channels, "delivery")
     email = cfg.setdefault("email", {})
     if not isinstance(email, dict) or set(email) - EMAIL_FIELDS:
         raise ValueError("email 包含未知字段")
     return cfg
+
+
+def validate_extension(spec, plugins, label):
+    if not isinstance(spec, dict) or set(spec) - {"type", "options"}:
+        raise ValueError(f"Invalid {label} definition")
+    if not isinstance(spec.get("type"), str) or spec["type"] not in plugins:
+        raise ValueError(f"Unknown {label}; explicitly register its plugin first")
+    if not isinstance(spec.get("options", {}), dict):
+        raise ValueError(f"{label}.options must be an object")
+    plugins[spec["type"]].validate(spec.get("options", {}))
 
 
 def smtp_config(cfg):
@@ -96,7 +103,7 @@ def smtp_config(cfg):
     return validate_config({"handle": "inforelay", **email}, require_smtp=True)
 
 
-def load(path=None):
+def load(path=None, registry=None):
     try:
         if path is not None:
             raw = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -106,4 +113,4 @@ def load(path=None):
             raw = json.loads(Path("subscriptions.json").read_text(encoding="utf-8"))
     except (ValueError, OSError):
         raise ValueError("无法读取配置。请设置 INFO_RELAY_CONFIG 或使用 --config 指定 JSON 文件") from None
-    return validate(raw)
+    return validate(raw, registry=registry)

@@ -154,8 +154,14 @@ def market(source, now):
 ADAPTERS = {"rss": rss, "github": github, "webpage": webpage, "x": x, "market": market}
 
 
-def fetch(source, now):
-    rows = ADAPTERS[source["type"]](source, now)
+def fetch(source, now, registry=None):
+    from .plugins import default_registry
+    from .state import checked_item
+    registry = registry or default_registry()
+    rows = registry.sources[source["type"]].fetch(source, now)
+    if not isinstance(rows, list) or len(rows) > 1000:
+        raise ValueError("Source adapters must return at most 1000 items")
+    rows = [checked_item(row) for row in rows]
     # Avoid duplicate items in one source response, even when feed GUIDs repeat.
     return list({row["id"]: row for row in rows}.values())
 
