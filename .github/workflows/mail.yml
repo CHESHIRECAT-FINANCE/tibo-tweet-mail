@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Run offline regression tests
-        run: python -m unittest -v
+        run: python -m unittest -v test_cloud test_delivery test_filter test_market_digest
       - name: Check configuration
         id: config
         env:

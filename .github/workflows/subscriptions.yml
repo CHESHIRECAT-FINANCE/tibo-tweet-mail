@@ -1,0 +1,88 @@
+name: InfoRelay subscriptions
+
+on:
+  schedule:
+    - cron: '4-59/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'diagnose checks connections; test-email sends one test; run delivers subscriptions'
+        type: choice
+        options: [diagnose, test-email, run]
+        default: diagnose
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inforelay-delivery
+  cancel-in-progress: false
+
+jobs:
+  subscriptions:
+    if: vars.INFO_RELAY_ENABLED == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      INFO_RELAY_STATE_PATH: ${{ github.workspace }}/../inforelay-local/state.json
+      INFO_RELAY_CLOUD_DIR: ${{ github.workspace }}/../inforelay-encrypted
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Install checkpoint encryption
+        run: python -m pip install -r requirements.txt
+      - name: Run offline tests
+        run: python -m unittest -v
+      - name: Validate subscriptions
+        env:
+          INFO_RELAY_CONFIG: ${{ secrets.INFO_RELAY_CONFIG }}
+        run: python -m info_relay check
+      - name: Diagnose without sending
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'diagnose'
+        env:
+          INFO_RELAY_CONFIG: ${{ secrets.INFO_RELAY_CONFIG }}
+        run: python -m info_relay diagnose
+      - name: Send one requested test email
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'test-email'
+        env:
+          INFO_RELAY_CONFIG: ${{ secrets.INFO_RELAY_CONFIG }}
+        run: python -m info_relay test-email
+      - name: Restore encrypted checkpoints
+        id: restore
+        if: github.event_name == 'schedule' || inputs.mode == 'run'
+        env:
+          INFO_RELAY_STATE_KEY: ${{ secrets.INFO_RELAY_STATE_KEY }}
+        run: python -m info_relay cloud-restore
+      - name: Deliver matching updates
+        id: deliver
+        if: steps.restore.outcome == 'success'
+        env:
+          INFO_RELAY_CONFIG: ${{ secrets.INFO_RELAY_CONFIG }}
+          INFO_RELAY_STATE_KEY: ${{ secrets.INFO_RELAY_STATE_KEY }}
+        run: python -m info_relay run
+      - name: Save encrypted checkpoints even after source failures
+        id: save
+        if: always() && steps.restore.outcome == 'success'
+        env:
+          INFO_RELAY_STATE_KEY: ${{ secrets.INFO_RELAY_STATE_KEY }}
+        run: python -m info_relay cloud-save
+      - name: Summarize
+        if: always()
+        env:
+          RESTORE_RESULT: ${{ steps.restore.outcome }}
+          DELIVERY_RESULT: ${{ steps.deliver.outcome }}
+          SAVE_RESULT: ${{ steps.save.outcome }}
+        run: |
+          python - <<'PY'
+          import os
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as report:
+              report.write('## InfoRelay\n\n')
+              for label, key in [('状态恢复', 'RESTORE_RESULT'), ('订阅发送', 'DELIVERY_RESULT'), ('加密状态保存', 'SAVE_RESULT')]:
+                  report.write(f'- {label}: {os.environ[key] or "未执行"}\n')
+              report.write('\nSMTP 成功表示服务器接受邮件；实际收件请检查邮箱。\n')
+          PY
