@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.DS_Store
+config.json
+.env
+.env.*
+state.json
+market-state.json
+*.lock
+*.tmp
+.deploy/
+subscriptions.json
+subscriptions.private.json
+.inforelay/
+.venv/
+*.key

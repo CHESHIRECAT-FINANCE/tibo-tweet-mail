@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "timezone": "Asia/Shanghai",
+  "batch_size": 20,
+  "email": {
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "you@gmail.com",
+    "smtp_password": "",
+    "to": "you@example.com"
+  },
+  "sources": [
+    {
+      "id": "python-news",
+      "type": "rss",
+      "name": "Python 博客",
+      "url": "https://blog.python.org/feeds/posts/default",
+      "keywords": [],
+      "exclude": [],
+      "initial": "skip"
+    },
+    {
+      "id": "github-releases",
+      "type": "github",
+      "name": "GitHub CLI 正式版",
+      "repository": "cli/cli",
+      "prereleases": false,
+      "initial": "skip"
+    }
+  ]
+}

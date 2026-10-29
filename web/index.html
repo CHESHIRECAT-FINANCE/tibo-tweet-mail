@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <title>InfoRelay · 你的信息订阅助手</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="model.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="masthead"><a href="#" class="brand"><span class="brand-symbol" aria-hidden="true">↳</span>InfoRelay</a><span class="edition">个人信息订阅助手</span><a href="https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail" target="_blank" rel="noopener noreferrer">开源代码</a></header>
+  <main>
+    <div class="intro"><h1>让信息来找你。</h1><p>订阅你关心的网站、动态和行情。把筛选后的更新，送进自己的邮箱。</p><div class="privacy-note"><span aria-hidden="true">●</span> 此页面在本机生成配置，不上传或保存你的输入。</div></div>
+    <div class="workspace">
+      <div class="editor">
+        <section aria-labelledby="sources-heading">
+          <div class="section-title"><span class="step">1</span><div><h2 id="sources-heading">选择你关心的信息</h2><p>可以添加多个来源，每个来源独立筛选。</p></div></div>
+          <div class="import-row"><button type="button" id="import-config" class="text-button">导入已有配置，继续修改</button><input type="file" id="import-file" accept=".json,application/json" hidden></div>
+          <div id="source-list"></div>
+          <div class="add-source"><label for="new-kind" class="sr-only">新信息源类型</label><select id="new-kind"><option value="rss">RSS 订阅</option><option value="webpage">网页更新</option><option value="github">GitHub 发布</option><option value="x">X 动态</option><option value="market">每日行情</option></select><button id="add-source" type="button" class="secondary">＋ 添加订阅</button></div>
+          <p class="hint">RSS 和 GitHub 默认只发启用后的新内容；网页先记录当前内容，再通知变化。</p>
+        </section>
+        <section aria-labelledby="mail-heading">
+          <div class="section-title"><span class="step">2</span><div><h2 id="mail-heading">送到你的邮箱</h2><p>使用自己的邮箱发送，不需要注册 InfoRelay 账号。</p></div></div>
+          <div class="mail-form">
+            <label>发件邮箱<input id="smtp-user" type="email" autocomplete="off" placeholder="you@gmail.com" required></label>
+            <label>收件邮箱<input id="mail-to" type="email" autocomplete="off" placeholder="接收更新的邮箱" required></label>
+            <label>SMTP 服务器<input id="smtp-host" value="smtp.gmail.com" autocomplete="off" required></label>
+            <label>SMTP 端口<select id="smtp-port"><option value="587">587 · STARTTLS</option><option value="465">465 · SSL / TLS</option></select></label>
+            <label class="full">SMTP 授权码 / 应用专用密码<input id="smtp-password" type="password" autocomplete="off" placeholder="由邮箱服务商提供" required><span class="hint">QQ、163 等邮箱需开启 SMTP 并使用授权码；Gmail 使用应用专用密码。</span></label>
+            <label>你的时区<select id="timezone"><option value="Asia/Shanghai">北京时间</option><option value="Asia/Tokyo">东京时间</option><option value="America/New_York">纽约时间</option><option value="Europe/London">伦敦时间</option><option value="UTC">UTC</option></select></label>
+          </div>
+        </section>
+        <section aria-labelledby="start-heading">
+          <div class="section-title"><span class="step">3</span><div><h2 id="start-heading">启用自动订阅</h2><p>配置好一次，之后由 GitHub 云端检查，电脑可以关机。</p></div></div>
+          <button type="button" id="generate" class="primary">生成我的订阅配置</button>
+          <p id="status" role="status" aria-live="polite"></p>
+          <div id="generated" hidden>
+            <div class="output-header"><label for="config-output">INFO_RELAY_CONFIG</label><button type="button" id="copy-config" class="text-button">复制配置</button></div>
+            <textarea id="config-output" readonly rows="9" spellcheck="false" aria-label="生成的私密订阅配置"></textarea>
+            <p class="hint">这里包含邮箱授权码。只粘贴到自己的 GitHub Secret，勿上传到代码仓库或公开分享。</p>
+            <div class="output-header"><label for="state-key">INFO_RELAY_STATE_KEY</label><button type="button" id="copy-key" class="text-button">复制密钥</button></div>
+            <input id="state-key" readonly aria-label="发送记录加密密钥">
+            <p class="hint">此密钥保护云端待发内容和记录。首次启用时保存；修改订阅时沿用原密钥，不能直接替换。</p>
+            <button type="button" id="download" class="secondary">下载私密配置文件</button>
+          </div>
+          <ol class="setup-steps">
+            <li><a href="https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail/fork" target="_blank" rel="noopener noreferrer">复制开源项目到自己的 GitHub</a>，进入仓库的 Settings → Secrets and variables → Actions。</li>
+            <li>添加两个 Repository secrets：<code>INFO_RELAY_CONFIG</code> 和 <code>INFO_RELAY_STATE_KEY</code>，分别粘贴上面生成的配置和密钥。</li>
+            <li>打开 Actions → <strong>InfoRelay subscriptions</strong> → Run workflow。先选 <code>diagnose</code> 检查，再选 <code>test-email</code> 发测试邮件。</li>
+            <li>收到测试邮件后，在 Actions 的 Variables 页添加 <code>INFO_RELAY_ENABLED</code>，值为 <code>true</code>。手动运行一次 <code>run</code> 建立记录，之后自动检查。</li>
+          </ol>
+          <p class="hint">新订阅每 10 分钟请求检查一次，GitHub 可能延迟调度。首次 Fork 后可能需要在 Actions 页面启用工作流。<a href="https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail#使用前了解" target="_blank" rel="noopener noreferrer">了解运行限制</a></p>
+        </section>
+      </div>
+      <aside class="preview" aria-labelledby="preview-heading"><div class="preview-top"><span>你的信息简报</span><span class="preview-mark" aria-hidden="true">↳</span></div><div class="preview-body"><p class="preview-caption">订阅计划预览 · 非实时抓取</p><h2 id="preview-heading">关注少一点，<br>收到更有用的。</h2><div id="preview-list"></div><div class="preview-foot"><strong>新内容 → 按你的条件筛选 → 邮件</strong><p>相同条目不会重复通知。临时发送失败的内容会保留，等待下一次运行重试。</p></div></div><div class="privacy-detail"><h3>信息由你掌握</h3><p>配置留在你的 GitHub Secrets。发送记录加密保存。页面没有统计脚本，也不会自动发送邮件。</p></div></aside>
+    </div>
+  </main>
+  <footer><span>InfoRelay 0.1 · MIT 开源</span><span>从一封可靠的邮件，开始自己的信息流。</span></footer>
+</body>
+</html>
