@@ -196,8 +196,23 @@ class EngineTests(unittest.TestCase):
         self.run_once([entry("1", "now wanted")], cfg)
         self.assertEqual(self.sent, [])
 
-    def test_empty_first_response_does_not_seed(self):
-        self.run_once([])
+    def test_empty_source_notifies_its_first_future_item(self):
+        for kind in ("rss", "github", "x"):
+            with self.subTest(kind=kind):
+                cfg = settings(type=kind, repository="cli/cli", handle="example")
+                before = len(self.sent)
+                self.run_once([], cfg)
+                self.assertTrue(state.read(self.path)["sources"]["news"]["seeded"])
+                self.run_once([entry("first-ever-update")], cfg)
+                self.assertEqual(len(self.sent), before + 1)
+
+    def test_initial_source_failure_does_not_create_a_baseline(self):
+        def fail(*args): raise RuntimeError("offline")
+        engine.run(self.cfg, self.path, now=NOW, fetcher=fail, sender=lambda *args: self.sent.append(args))
+        self.assertFalse(state.read(self.path)["sources"]["news"]["seeded"])
+
+    def test_market_before_due_hour_does_not_create_a_baseline(self):
+        self.run_once([], settings(type="market"))
         self.assertFalse(state.read(self.path)["sources"]["news"]["seeded"])
 
     def test_config_change_does_not_silently_discard_pending(self):
