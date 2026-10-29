@@ -28,6 +28,23 @@ class CloudConfigTests(unittest.TestCase):
         }), {'seeded': True, 'seen': ['123']})
         with self.assertRaises(ValueError):
             cloud_state.checked_state('state.json', {'seen': ['not-a-post-id']})
+        with self.assertRaises(ValueError) as caught:
+            cloud_state.checked_state('market-state.json', {'sent_date': 'private-value'})
+        self.assertNotIn('private-value', str(caught.exception))
+
+    def test_pending_notice_whitelist_and_consistency(self):
+        item = {'id': '2', 'text': 'Usage reset now', 'created_timestamp': 1,
+                'author': {'screen_name': 'example', 'private': 'not-public'},
+                'smtp_password': 'private', 'url': 'https://example.com/private-token'}
+        cleaned = cloud_state.checked_state('state.json', {'seeded': True, 'seen': ['1'], 'pending': [item]})
+        text = json.dumps(cleaned)
+        self.assertNotIn('private', text)
+        self.assertEqual(cleaned['pending'][0]['url'], 'https://x.com/i/status/2')
+        for state in ({'seeded': True, 'seen': ['2'], 'pending': [item]},
+                      {'seeded': False, 'seen': [], 'pending': [item]},
+                      {'seeded': True, 'seen': [], 'pending': [item, item]}):
+            with self.assertRaises(ValueError):
+                cloud_state.checked_state('state.json', state)
 
 
 class CloudPersistenceTests(unittest.TestCase):
@@ -70,6 +87,17 @@ class CloudPersistenceTests(unittest.TestCase):
         files = cloud_state.git('ls-tree', '--name-only', 'HEAD', cwd=second).stdout.splitlines()
         self.assertEqual(sorted(files), ['market-state.json', 'state.json'])
 
+    def test_pending_queue_survives_fresh_cloud_runner(self):
+        first = self.root / 'first-run'
+        cloud_state.restore(first)
+        pending = {'id': '123', 'text': 'Usage reset now', 'created_timestamp': 1,
+                   'author': {'screen_name': 'example'}}
+        cloud_state.write_state(first, 'state.json', {'seeded': True, 'seen': [], 'pending': [pending]})
+        cloud_state.save(first)
+        cloud_state.restore(self.root / 'second-run')
+        restored = json.loads((self.root / 'second-run' / 'state.json').read_text())
+        self.assertEqual(restored['pending'][0]['id'], '123')
+
     def test_unreachable_remote_is_not_treated_as_first_run(self):
         cloud_state.git('remote', 'set-url', 'origin', str(self.root / 'missing.git'))
         with self.assertRaises(subprocess.CalledProcessError):
@@ -83,6 +111,44 @@ class CloudPersistenceTests(unittest.TestCase):
         cloud_state.git('push', 'origin', 'HEAD:refs/heads/mail-state', cwd=first)
         with self.assertRaises(RuntimeError):
             cloud_state.restore(self.root / 'second-run')
+
+    def test_pre_staged_non_checkpoint_file_is_never_published(self):
+        directory = self.root / 'state'
+        cloud_state.restore(directory)
+        original = cloud_state.git('rev-parse', 'HEAD', cwd=directory).stdout
+        (directory / 'config.json').write_text('{"smtp_password":"private"}')
+        cloud_state.git('add', 'config.json', cwd=directory)
+        with self.assertRaisesRegex(RuntimeError, 'Unexpected tracked'):
+            cloud_state.save(directory)
+        self.assertEqual(cloud_state.git('rev-parse', 'HEAD', cwd=directory).stdout, original)
+
+    def test_missing_local_checkpoint_cannot_silently_save(self):
+        directory = self.root / 'state'
+        cloud_state.restore(directory)
+        (directory / 'market-state.json').unlink()
+        with self.assertRaisesRegex(RuntimeError, 'Missing checkpoint'):
+            cloud_state.save(directory)
+
+    def test_push_timeout_retries_same_checkpoint(self):
+        directory = self.root / 'state'
+        cloud_state.restore(directory)
+        (directory / 'market-state.json').write_text('{"sent_date":"2026-10-29"}')
+        original_git = cloud_state.git
+        pushes = []
+
+        def unreliable_git(*args, **kwargs):
+            if args[0] == 'push':
+                pushes.append(args)
+                if len(pushes) == 1:
+                    raise subprocess.TimeoutExpired('git', 60)
+            return original_git(*args, **kwargs)
+
+        with patch.object(cloud_state, 'git', side_effect=unreliable_git), \
+             patch('cloud_state.time.sleep'):
+            cloud_state.save(directory)
+        self.assertEqual(pushes[0], pushes[1])
+        self.assertEqual(json.loads(cloud_state.git('show', 'refs/heads/mail-state:market-state.json',
+                                                   cwd=self.remote).stdout)['sent_date'], '2026-10-29')
 
 
 if __name__ == '__main__':
