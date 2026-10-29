@@ -1,63 +1,46 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
-  <title>InfoRelay · 你的信息订阅助手</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="model.js" defer></script>
-  <script src="app.js" defer></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'none'; base-uri 'none'">
+  <title>InfoRelay · 信息订阅助手</title>
+  <link rel="stylesheet" href="style.css"><script src="model.js" defer></script><script src="i18n.js" defer></script><script src="app.js" defer></script>
 </head>
 <body>
-  <header class="masthead"><a href="#" class="brand"><span class="brand-symbol" aria-hidden="true">↳</span>InfoRelay</a><span class="edition">个人信息订阅助手</span><a href="https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail" target="_blank" rel="noopener noreferrer">开源代码</a></header>
-  <main>
-    <div class="intro"><h1>让信息来找你。</h1><p>订阅你关心的网站、动态和行情。把筛选后的更新，送进自己的邮箱。</p><div class="privacy-note"><span aria-hidden="true">●</span> 此页面在本机生成配置，不上传或保存你的输入。</div></div>
-    <div class="workspace">
-      <div class="editor">
-        <section aria-labelledby="sources-heading">
-          <div class="section-title"><span class="step">1</span><div><h2 id="sources-heading">选择你关心的信息</h2><p>可以添加多个来源，每个来源独立筛选。</p></div></div>
-          <div class="import-row"><button type="button" id="import-config" class="text-button">导入已有配置，继续修改</button><input type="file" id="import-file" accept=".json,application/json" hidden></div>
-          <div id="source-list"></div>
-          <div class="add-source"><label for="new-kind" class="sr-only">新信息源类型</label><select id="new-kind"><option value="rss">RSS 订阅</option><option value="webpage">网页更新</option><option value="github">GitHub 发布</option><option value="x">X 动态</option><option value="market">每日行情</option></select><button id="add-source" type="button" class="secondary">＋ 添加订阅</button></div>
-          <p class="hint">RSS 和 GitHub 默认只发启用后的新内容；网页先记录当前内容，再通知变化。</p>
-        </section>
-        <section aria-labelledby="mail-heading">
-          <div class="section-title"><span class="step">2</span><div><h2 id="mail-heading">送到你的邮箱</h2><p>使用自己的邮箱发送，不需要注册 InfoRelay 账号。</p></div></div>
-          <div class="mail-form">
-            <label>发件邮箱<input id="smtp-user" type="email" autocomplete="off" placeholder="you@gmail.com" required></label>
-            <label>收件邮箱<input id="mail-to" type="email" autocomplete="off" placeholder="接收更新的邮箱" required></label>
-            <label>SMTP 服务器<input id="smtp-host" value="smtp.gmail.com" autocomplete="off" required></label>
-            <label>SMTP 端口<select id="smtp-port"><option value="587">587 · STARTTLS</option><option value="465">465 · SSL / TLS</option></select></label>
-            <label class="full">SMTP 授权码 / 应用专用密码<input id="smtp-password" type="password" autocomplete="off" placeholder="由邮箱服务商提供" required><span class="hint">QQ、163 等邮箱需开启 SMTP 并使用授权码；Gmail 使用应用专用密码。</span></label>
-            <label>你的时区<select id="timezone"><option value="Asia/Shanghai">北京时间</option><option value="Asia/Tokyo">东京时间</option><option value="America/New_York">纽约时间</option><option value="Europe/London">伦敦时间</option><option value="UTC">UTC</option></select></label>
-          </div>
-        </section>
-        <section aria-labelledby="start-heading">
-          <div class="section-title"><span class="step">3</span><div><h2 id="start-heading">启用自动订阅</h2><p>配置好一次，之后由 GitHub 云端检查，电脑可以关机。</p></div></div>
-          <button type="button" id="generate" class="primary">生成我的订阅配置</button>
-          <p id="status" role="status" aria-live="polite"></p>
-          <div id="generated" hidden>
-            <div class="output-header"><label for="config-output">INFO_RELAY_CONFIG</label><button type="button" id="copy-config" class="text-button">复制配置</button></div>
-            <textarea id="config-output" readonly rows="9" spellcheck="false" aria-label="生成的私密订阅配置"></textarea>
-            <p class="hint">这里包含邮箱授权码。只粘贴到自己的 GitHub Secret，勿上传到代码仓库或公开分享。</p>
-            <div class="output-header"><label for="state-key">INFO_RELAY_STATE_KEY</label><button type="button" id="copy-key" class="text-button">复制密钥</button></div>
-            <input id="state-key" readonly aria-label="发送记录加密密钥">
-            <p class="hint">此密钥保护云端待发内容和记录。首次启用时保存；修改订阅时沿用原密钥，不能直接替换。</p>
-            <button type="button" id="download" class="secondary">下载私密配置文件</button>
-          </div>
-          <ol class="setup-steps">
-            <li><a href="https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail/fork" target="_blank" rel="noopener noreferrer">复制开源项目到自己的 GitHub</a>，进入仓库的 Settings → Secrets and variables → Actions。</li>
-            <li>添加两个 Repository secrets：<code>INFO_RELAY_CONFIG</code> 和 <code>INFO_RELAY_STATE_KEY</code>，分别粘贴上面生成的配置和密钥。</li>
-            <li>打开 Actions → <strong>InfoRelay subscriptions</strong> → Run workflow。先选 <code>diagnose</code> 检查，再选 <code>test-email</code> 发测试邮件。</li>
-            <li>收到测试邮件后，在 Actions 的 Variables 页添加 <code>INFO_RELAY_ENABLED</code>，值为 <code>true</code>。手动运行一次 <code>run</code> 建立记录，之后自动检查。</li>
-          </ol>
-          <p class="hint">新订阅每 10 分钟请求检查一次，GitHub 可能延迟调度。首次 Fork 后可能需要在 Actions 页面启用工作流。<a href="https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail#使用前了解" target="_blank" rel="noopener noreferrer">了解运行限制</a></p>
-        </section>
-      </div>
-      <aside class="preview" aria-labelledby="preview-heading"><div class="preview-top"><span>你的信息简报</span><span class="preview-mark" aria-hidden="true">↳</span></div><div class="preview-body"><p class="preview-caption">订阅计划预览 · 非实时抓取</p><h2 id="preview-heading">关注少一点，<br>收到更有用的。</h2><div id="preview-list"></div><div class="preview-foot"><strong>新内容 → 按你的条件筛选 → 邮件</strong><p>自动记录已处理的条目并去重。临时发送失败的内容会保留，等待下一次运行重试。</p></div></div><div class="privacy-detail"><h3>信息由你掌握</h3><p>配置留在你的 GitHub Secrets。发送记录加密保存。页面没有统计脚本，也不会自动发送邮件。</p></div></aside>
+<header class="masthead"><a href="#" class="brand"><span class="brand-symbol" aria-hidden="true">↳</span>InfoRelay</a><span class="edition" data-zh="自己的信息，自己的节奏" data-en="Your information. Your pace."></span><nav><button id="language" type="button">English</button><a href="https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail" target="_blank" rel="noopener noreferrer" data-zh="开源项目" data-en="Source code"></a></nav></header>
+<main>
+  <div class="intro"><div><h1 data-zh="让信息来找你。" data-en="An inbox for what matters."></h1><p data-zh="选好你关心的内容，验证邮箱，开启自动订阅。" data-en="Choose your sources, check your mailbox, and turn on automatic updates."></p></div><p class="mode" id="mode-label" data-zh="配置向导" data-en="Setup guide"></p></div>
+  <nav class="wizard-nav" aria-label="Setup steps"><button type="button" data-step="1" aria-current="step"><span>1</span><b data-zh="选择内容" data-en="Choose sources"></b></button><button type="button" data-step="2"><span>2</span><b data-zh="连接邮箱" data-en="Connect email"></b></button><button type="button" data-step="3"><span>3</span><b data-zh="验证并启动" data-en="Check & start"></b></button></nav>
+  <p id="status" role="status" aria-live="polite"></p>
+  <div class="workspace"><div class="editor">
+  <section class="wizard-panel" data-panel="1" aria-labelledby="sources-heading">
+    <h2 id="sources-heading" tabindex="-1" data-zh="从一个订阅开始。" data-en="Start with one subscription."></h2><p class="section-help" data-zh="先试试示例，也可以换成你自己的链接。所有来源都能单独暂停。" data-en="Try a ready-made example or enter your own link. Pause each source whenever you like."></p>
+    <div class="presets"><button type="button" data-preset="rss"><strong data-zh="Python 博客" data-en="Python blog"></strong><span data-zh="读一篇新文章" data-en="Read new posts"></span></button><button type="button" data-preset="github"><strong>GitHub CLI</strong><span data-zh="收到新版本消息" data-en="Follow new releases"></span></button><button type="button" data-preset="market"><strong data-zh="每日行情" data-en="Daily markets"></strong><span data-zh="汇率、原油和黄金" data-en="FX, oil and gold"></span></button></div>
+    <div class="import-row"><button type="button" id="import-config" class="text-button" data-zh="导入已有配置" data-en="Import existing settings"></button><input type="file" id="import-file" accept=".json,application/json" hidden></div><div id="source-list"></div>
+    <div class="add-source"><label for="new-kind" class="sr-only" data-zh="信息源类型" data-en="Source type"></label><select id="new-kind"><option value="rss">RSS / Atom</option><option value="webpage" data-zh="网页更新" data-en="Website changes"></option><option value="github" data-zh="GitHub 发布" data-en="GitHub releases"></option><option value="x" data-zh="X 动态" data-en="X posts"></option><option value="market" data-zh="每日行情" data-en="Daily markets"></option></select><button id="add-source" type="button" class="secondary" data-zh="＋ 添加订阅" data-en="＋ Add source"></button></div>
+    <p class="hint" data-zh="默认不发送已有文章；首次检查记录当前内容，以后有新内容才通知。行情会发送当天日报。" data-en="Existing articles are skipped on the first check. Later updates trigger notifications. Markets send the current day’s digest."></p>
+    <div class="step-actions"><button type="button" class="primary" id="next-sources" data-zh="下一步：连接邮箱" data-en="Next: connect email"></button></div>
+  </section>
+  <section class="wizard-panel" data-panel="2" hidden aria-labelledby="mail-heading">
+    <h2 id="mail-heading" tabindex="-1" data-zh="用自己的邮箱接收。" data-en="Delivered to your mailbox."></h2><p class="section-help" data-zh="无需注册 InfoRelay。选择邮箱服务商，我们会填好服务器参数。" data-en="No InfoRelay account needed. Choose your email provider and we’ll fill in its server settings."></p>
+    <div class="mail-form"><label class="full"><span data-zh="发件邮箱服务商" data-en="Sending email provider"></span><select id="provider"><option value="qq">QQ Mail</option><option value="163">163 Mail</option><option value="gmail">Gmail</option><option value="custom" data-zh="其他 / 自定义" data-en="Other / custom"></option></select></label>
+    <label><span data-zh="发件邮箱" data-en="Sender email"></span><input id="smtp-user" type="email" autocomplete="off" placeholder="you@qq.com" required></label><label><span data-zh="收件邮箱" data-en="Recipient email"></span><input id="mail-to" type="email" autocomplete="off" placeholder="you@example.com" required></label>
+    <label class="full"><span id="password-label" data-zh="邮箱授权码 / 应用专用密码" data-en="Email authorization code / app password"></span><input id="smtp-password" aria-labelledby="password-label" aria-describedby="password-hint" type="password" autocomplete="new-password" required><span class="hint" id="password-hint"></span><a id="provider-help" target="_blank" rel="noopener noreferrer" data-zh="查看服务商的设置帮助" data-en="Open your provider’s setup help"></a></label>
+    <details class="full advanced"><summary data-zh="服务器与时间设置" data-en="Server and time settings"></summary><div class="mail-form"><label><span data-zh="SMTP 服务器" data-en="SMTP server"></span><input id="smtp-host" value="smtp.qq.com" autocomplete="off" required></label><label><span data-zh="加密端口" data-en="TLS port"></span><select id="smtp-port"><option value="465">465 · TLS</option><option value="587">587 · STARTTLS</option></select></label><label><span data-zh="你的时区" data-en="Your time zone"></span><select id="timezone"><option value="Asia/Shanghai">Asia/Shanghai</option><option value="Asia/Tokyo">Asia/Tokyo</option><option value="America/New_York">America/New_York</option><option value="Europe/London">Europe/London</option><option value="UTC">UTC</option></select></label></div></details></div>
+    <div class="step-actions"><button type="button" class="secondary" data-back="1" data-zh="上一步" data-en="Back"></button><button type="button" class="primary" id="next-mail" data-zh="下一步：验证并启动" data-en="Next: check & start"></button></div>
+  </section>
+  <section class="wizard-panel" data-panel="3" hidden aria-labelledby="start-heading">
+    <h2 id="start-heading" tabindex="-1" data-zh="确认一切就绪。" data-en="Make sure you’re ready."></h2>
+    <div id="local-controls" hidden><p class="section-help" data-zh="先检查，再发一封测试邮件。确认能收到后，开启自动检查。" data-en="Check connections, then send one test email. Turn on automatic checks after verifying your inbox."></p>
+      <div class="action-list"><div><b data-zh="检查连接" data-en="Check connections"></b><p data-zh="保存到这台电脑，检查信息源与邮箱；不会发邮件。" data-en="Save on this computer and check sources and email. No email is sent."></p><button type="button" id="diagnose" class="secondary" data-zh="保存并检查" data-en="Save & check"></button></div><div><b data-zh="看看内容" data-en="Preview content"></b><p data-zh="查看最新匹配内容；不发送，也不改变发送记录。" data-en="See recent matches without sending or changing delivery records."></p><button type="button" id="preview-live" class="secondary" data-zh="预览内容" data-en="Preview"></button></div><div><b data-zh="验证收件" data-en="Verify your inbox"></b><p data-zh="只在你点击后发送一封测试邮件。" data-en="Send one test email only when you click this button."></p><button type="button" id="test-email" class="secondary" data-zh="发一封测试邮件" data-en="Send one test email"></button></div></div>
+      <div id="task-result" role="status" aria-live="polite"></div>
+      <div class="start-box"><label class="check-label"><input type="checkbox" id="allow-send"><span data-zh="我已确认邮箱可用，允许自动发送这些订阅的更新。" data-en="I have verified my mailbox and allow automatic delivery of these subscriptions."></span></label><label><span data-zh="检查间隔" data-en="Check interval"></span><select id="interval"><option value="600" data-zh="每 10 分钟" data-en="Every 10 minutes"></option><option value="1800" data-zh="每 30 分钟" data-en="Every 30 minutes"></option><option value="3600" data-zh="每小时" data-en="Every hour"></option></select></label><div class="run-buttons"><button type="button" id="start" class="primary" data-zh="开启自动订阅" data-en="Start automatic checks"></button><button type="button" id="stop" class="secondary" hidden data-zh="停止自动检查" data-en="Stop checks"></button></div><p class="hint" data-zh="本地模式需要电脑和启动窗口保持运行。关闭或重启后，需要在页面重新开启；关闭浏览器标签不会停止。想让电脑关机后继续运行？使用下方云端方案。" data-en="Local mode needs this computer and the launcher to stay running. Restart checks after closing or restarting the launcher. Closing a browser tab does not stop checks. For always-on delivery, use the cloud option below."></p></div>
     </div>
-  </main>
-  <footer><span>InfoRelay 0.1 · MIT 开源</span><span>从一封可靠的邮件，开始自己的信息流。</span></footer>
-</body>
-</html>
+    <details id="cloud-controls" open><summary data-zh="使用 GitHub 云端运行（电脑可关机）" data-en="Run on GitHub (works while your computer is off)"></summary><p class="section-help" data-zh="适合愿意完成一次 GitHub 设置的用户。静态页面只生成配置，不会自动发送。" data-en="For users comfortable with a one-time GitHub setup. The static page generates settings and never sends email."></p>
+    <button type="button" id="generate" class="primary" data-zh="生成云端配置" data-en="Generate cloud settings"></button><div id="generated" hidden><div class="output-header"><label for="config-output">INFO_RELAY_CONFIG</label><button type="button" id="copy-config" class="text-button" data-zh="复制配置" data-en="Copy settings"></button></div><textarea id="config-output" readonly rows="7" spellcheck="false" aria-label="Private subscription settings"></textarea><p class="hint" data-zh="含邮箱授权码，只能粘贴到自己仓库的 Secret；不要上传到代码、Issue 或截图。" data-en="Contains your email app password. Paste only into your repository Secret. Never share it in code, issues or screenshots."></p><div class="output-header"><label for="state-key">INFO_RELAY_STATE_KEY</label><button type="button" id="copy-key" class="text-button" data-zh="复制密钥" data-en="Copy key"></button></div><input id="state-key" readonly aria-label="Checkpoint encryption key"><p class="hint" id="key-hint"></p><button type="button" id="download" class="secondary" data-zh="下载私密配置文件" data-en="Download private settings"></button></div>
+    <ol class="setup-steps"><li><a href="https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail/fork" target="_blank" rel="noopener noreferrer" data-zh="Fork 项目到自己的 GitHub" data-en="Fork the project to your GitHub account"></a><span data-zh="，打开 Settings → Secrets and variables → Actions。" data-en=". Open Settings → Secrets and variables → Actions."></span></li><li data-zh="添加两个 Repository secrets：INFO_RELAY_CONFIG 和 INFO_RELAY_STATE_KEY，分别粘贴配置和密钥。修改已有订阅时，保留原密钥。" data-en="Add two repository secrets: INFO_RELAY_CONFIG and INFO_RELAY_STATE_KEY. Paste your settings and key. Keep the original key when updating existing subscriptions."></li><li data-zh="Actions → InfoRelay subscriptions → Run workflow：先选 diagnose 检查，再选 test-email 测试收件。Fork 后可能需要先启用 Actions。" data-en="Actions → InfoRelay subscriptions → Run workflow: run diagnose, then test-email. You may need to enable Actions after forking."></li><li data-zh="收到邮件后，添加 Actions 变量 INFO_RELAY_ENABLED=true，手动运行一次 run。之后约每 10 分钟检查，GitHub 调度可能延迟。" data-en="After receiving the email, add the Actions variable INFO_RELAY_ENABLED=true and run once in run mode. Checks are requested every 10 minutes; GitHub may delay them."></li></ol>
+    <a id="guide-link" href="https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail/blob/main/docs/zh/guide.md" target="_blank" rel="noopener noreferrer" data-zh="打开完整上手指南与故障排查" data-en="Open the full guide and troubleshooting"></a></details><div class="step-actions"><button type="button" class="secondary" data-back="2" data-zh="上一步" data-en="Back"></button></div>
+  </section>
+  </div><aside class="preview" aria-labelledby="preview-heading"><div class="preview-top"><span id="preview-heading" data-zh="我的订阅计划" data-en="My subscriptions"></span><span class="preview-mark" aria-hidden="true">↳</span></div><div class="preview-body"><p class="preview-caption" data-zh="配置预览 · 不是实时抓取结果" data-en="Settings preview · not live content"></p><div id="preview-list"></div><div class="preview-foot"><strong data-zh="获取 → 筛选 → 记录 → 通知" data-en="Fetch → filter → save → notify"></strong><p data-zh="自动记录已处理内容。临时发送失败的内容保留在待发队列，等待下次重试。" data-en="Processed items are remembered. Failed deliveries stay in the queue for a later retry."></p></div></div><div class="runtime-panel" id="runtime-panel" hidden><h3 data-zh="运行状态" data-en="Runtime status"></h3><p id="runtime-status"></p><p id="runtime-time" class="hint"></p></div><div class="privacy-detail"><h3 data-zh="信息由你掌握" data-en="Your information stays yours"></h3><p id="privacy-copy"></p></div></aside></div>
+</main><footer><span>InfoRelay 0.2 · MIT</span><a href="https://github.com/CHESHIRECAT-FINANCE/tibo-tweet-mail/blob/main/docs/en/architecture.md" target="_blank" rel="noopener noreferrer" data-zh="开发者：扩展自己的信息流" data-en="Developers: build your own pipeline"></a></footer>
+</body></html>

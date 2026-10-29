@@ -29,9 +29,8 @@
     }
     return value;
   }
-  function build(sources, email, timezone, batchSize = 20) {
+  function validateSources(sources) {
     if (!sources.length || sources.length > 20) throw new Error('请添加 1 到 20 个信息源');
-    if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 50) throw new Error('每批发送数量必须为 1 到 50');
     const ids = new Set();
     for (const source of sources) {
       if (!kinds[source.type] || !/^[a-zA-Z0-9_-]{1,48}$/.test(source.id)) throw new Error('信息源类型或 ID 无效');
@@ -50,14 +49,20 @@
         if (!Array.isArray(source[field]) || source[field].length > 30 || source[field].some(x => typeof x !== 'string' || !x.trim() || x.length > 100 || /[\x00-\x1f\x7f]/.test(x))) throw new Error('每组最多填写 30 个关键词，每个词不超过 100 字');
       }
     }
+    return true;
+  }
+  function build(sources, email, timezone, batchSize = 20, allowSavedPassword = false) {
+    validateSources(sources);
+    if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 50) throw new Error('每批发送数量必须为 1 到 50');
+    try { new Intl.DateTimeFormat('en', {timeZone: timezone}); } catch (_) { throw new Error('时区无效'); }
     if (!/^[A-Za-z0-9.-]+$/.test(email.smtp_host)) throw new Error('请填写 SMTP 服务器名称');
     if (!Number.isInteger(email.smtp_port) || email.smtp_port < 1 || email.smtp_port > 65535) throw new Error('请填写有效的 SMTP 端口');
     for (const value of [email.smtp_user, email.to]) {
       if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(value)) throw new Error('请填写完整的发件和收件邮箱');
     }
-    if (!email.smtp_password.trim()) throw new Error('请填写邮箱的 SMTP 授权码或应用专用密码');
+    if (!email.smtp_password.trim() && !allowSavedPassword) throw new Error('请填写邮箱的 SMTP 授权码或应用专用密码');
     if ([...Object.values(email).filter(x => typeof x === 'string'), ...sources.map(x => x.name)].some(x => /[\x00-\x1f\x7f]/.test(x))) throw new Error('输入中不能包含控制字符');
     return {version: 1, timezone, batch_size: batchSize, email: {...email}, sources: JSON.parse(JSON.stringify(sources))};
   }
-  return {kinds, createSource, words, build};
+  return {kinds, createSource, words, build, validateSources, checkURL};
 });
